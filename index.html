@@ -190,41 +190,60 @@
       opacity: 0.35;
     }
 
-    /* BLACKOUT OVERLAY */
-    #blackout {
+    /* GLITCH OVERLAY */
+    #glitch-overlay {
       position: fixed;
       inset: 0;
-      background: #000;
+      background: #080C0A;
+      z-index: 90;
+      display: none;
       opacity: 0;
       pointer-events: none;
-      z-index: 100;
-      transition: opacity 3s ease-in;
     }
-    #blackout.fading { opacity: 1; }
+    #glitch-overlay::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,255,65,0.03) 2px,
+        rgba(0,255,65,0.03) 4px
+      );
+    }
+
+    /* STATIC CANVAS */
+    #static-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 95;
+      display: none;
+      image-rendering: pixelated;
+    }
 
     /* TV OFF */
     #tv-off {
       position: fixed;
       inset: 0;
       background: #000;
-      opacity: 0;
-      pointer-events: none;
       z-index: 110;
-      display: flex;
+      display: none;
       align-items: center;
       justify-content: center;
+      opacity: 1;
     }
-    #tv-off.active { opacity: 1; pointer-events: all; }
     .tv-line {
       width: 100%;
-      height: 2px;
+      height: 3px;
       background: #fff;
-      transform: scaleX(1);
+      transform: scaleX(1) scaleY(1);
       opacity: 1;
-      transition: transform 0.5s ease-in, opacity 0.4s ease-in 0.4s;
+      transition: transform 0.5s ease-in, opacity 0.3s ease-in 0.45s;
+      box-shadow: 0 0 12px #fff, 0 0 40px rgba(255,255,255,0.4);
     }
     #tv-off.collapse .tv-line {
-      transform: scaleX(0);
+      transform: scaleX(0) scaleY(1);
       opacity: 0;
     }
 
@@ -385,8 +404,11 @@
     <span class="footer-text">All information confidential</span>
   </footer>
 
-  <!-- BLACKOUT -->
-  <div id="blackout"></div>
+  <!-- GLITCH OVERLAY -->
+  <div id="glitch-overlay"></div>
+
+  <!-- STATIC CANVAS -->
+  <canvas id="static-canvas"></canvas>
 
   <!-- TV OFF -->
   <div id="tv-off"><div class="tv-line"></div></div>
@@ -410,15 +432,14 @@
   </div>
 
   <script>
-    const READING_TIME  = 60000;  // 60 seconds
-    const FADE_DURATION = 3000;   // 3s fade to black
-    const TV_DURATION   = 600;    // TV collapse
+    const READING_TIME = 30000; // 30 seconds
 
-    const bar      = document.getElementById('countdown-bar');
-    const splash   = document.getElementById('splash');
-    const blackout = document.getElementById('blackout');
-    const tvOff    = document.getElementById('tv-off');
-    const ghost    = document.getElementById('ghost');
+    const bar    = document.getElementById('countdown-bar');
+    const splash = document.getElementById('splash');
+    const tvOff  = document.getElementById('tv-off');
+    const ghost  = document.getElementById('ghost');
+    const glitch = document.getElementById('glitch-overlay');
+    const static_ = document.getElementById('static-canvas');
 
     // Kick off countdown bar shrink
     requestAnimationFrame(() => {
@@ -426,32 +447,91 @@
       bar.style.transform  = 'scaleX(0)';
     });
 
-    // After reading time: fade to black
-    setTimeout(() => {
-      splash.style.transition = 'opacity ' + (FADE_DURATION / 1000) + 's ease-in';
-      splash.style.opacity    = '0';
-      bar.style.opacity       = '0';
-      blackout.classList.add('fading');
+    // --- STATIC NOISE CANVAS ---
+    const ctx = static_.getContext('2d');
+    let staticFrame;
+    function drawStatic(opacity) {
+      static_.width  = window.innerWidth;
+      static_.height = window.innerHeight;
+      const imageData = ctx.createImageData(static_.width, static_.height);
+      const data = imageData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const v = Math.random() > 0.5 ? 255 : 0;
+        data[i]   = v;
+        data[i+1] = v;
+        data[i+2] = v;
+        data[i+3] = Math.floor(opacity * 255);
+      }
+      ctx.putImageData(imageData, 0, 0);
+    }
 
-      // After fade: TV collapse
+    function animateStatic(opacity) {
+      drawStatic(opacity);
+      staticFrame = requestAnimationFrame(() => animateStatic(opacity));
+    }
+
+    // --- GLITCH EFFECT ---
+    function startGlitch() {
+      glitch.style.display = 'block';
+      let flickers = 0;
+      const maxFlickers = 12;
+      function flicker() {
+        if (flickers >= maxFlickers) {
+          endGlitch();
+          return;
+        }
+        glitch.style.opacity = Math.random() > 0.4 ? (Math.random() * 0.7 + 0.3).toFixed(2) : '0';
+        glitch.style.transform = `translate(${(Math.random()-0.5)*12}px, ${(Math.random()-0.5)*8}px) skewX(${(Math.random()-0.5)*4}deg)`;
+        flickers++;
+        setTimeout(flicker, 60 + Math.random() * 80);
+      }
+      flicker();
+    }
+
+    function endGlitch() {
+      glitch.style.display = 'none';
+      startStatic();
+    }
+
+    // --- STATIC PHASE ---
+    function startStatic() {
+      static_.style.display = 'block';
+      splash.style.display = 'none';
+      bar.style.display = 'none';
+      animateStatic(0.85);
+
+      // Static runs for 1.2s then collapses to TV line
       setTimeout(() => {
-        splash.style.display = 'none';
-        blackout.style.display = 'none';
-        tvOff.classList.add('active');
+        cancelAnimationFrame(staticFrame);
+        static_.style.display = 'none';
+        startTVCollapse();
+      }, 1200);
+    }
 
+    // --- TV COLLAPSE ---
+    function startTVCollapse() {
+      tvOff.style.display = 'flex';
+      tvOff.style.opacity = '1';
+      tvOff.style.pointerEvents = 'all';
+
+      setTimeout(() => {
+        tvOff.classList.add('collapse');
         setTimeout(() => {
-          tvOff.classList.add('collapse');
+          tvOff.style.display = 'none';
+          showGhost();
+        }, 700);
+      }, 80);
+    }
 
-          // After TV line vanishes: ghost screen
-          setTimeout(() => {
-            tvOff.classList.remove('active');
-            ghost.classList.add('visible');
-          }, TV_DURATION);
+    // --- GHOST SCREEN ---
+    function showGhost() {
+      ghost.classList.add('visible');
+    }
 
-        }, 80);
-
-      }, FADE_DURATION);
-
+    // --- TRIGGER AFTER READING TIME ---
+    setTimeout(() => {
+      bar.style.opacity = '0';
+      startGlitch();
     }, READING_TIME);
   </script>
 
