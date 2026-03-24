@@ -146,6 +146,34 @@
       animation: fadeIn 1s ease-out 1.5s forwards;
     }
 
+    @media (max-width: 600px) {
+      .nav-tag { display: none; }
+      #splash {
+        padding: 0 8vw;
+        padding-top: 72px;
+        justify-content: center;
+      }
+      .eyebrow {
+        font-size: 9px;
+        letter-spacing: .12em;
+        margin-bottom: 20px;
+      }
+      h1 {
+        font-size: clamp(52px, 16vw, 76px);
+        margin-bottom: 24px;
+      }
+      .tagline {
+        font-size: 13px;
+        margin-bottom: 32px;
+      }
+      .site-footer {
+        padding: 0 20px;
+      }
+      .footer-text:not(:last-child) {
+        display: none;
+      }
+    }
+
     .blink { animation: blink 2s step-end infinite; }
     @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
 
